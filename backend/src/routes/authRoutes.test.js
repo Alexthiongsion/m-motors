@@ -105,3 +105,99 @@ describe("POST /api/auth/register", () => {
     expect(response.body.message).toBe("Un compte existe déjà avec cette adresse email.");
   });
 });
+
+describe("POST /api/auth/login", () => {
+  test("connecte un client avec des identifiants valides", async () => {
+    await request(app).post("/api/auth/register").send({
+      firstName: "Client",
+      lastName: "Test",
+      email: "client.login@test.com",
+      password: "Password123",
+    });
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "client.login@test.com",
+      password: "Password123",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Connexion réussie.");
+    expect(response.body.user.email).toBe("client.login@test.com");
+    expect(response.body.user.role).toBe("client");
+  });
+
+  test("connecte un administrateur avec des identifiants valides", async () => {
+    const passwordHash = await bcrypt.hash("Password123", 10);
+
+    await pool.query(
+      `
+      INSERT INTO users (first_name, last_name, email, password_hash, role)
+      VALUES ($1, $2, $3, $4, $5)
+      `,
+      ["Admin", "Test", "admin.login@test.com", passwordHash, "admin"]
+    );
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "admin.login@test.com",
+      password: "Password123",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Connexion réussie.");
+    expect(response.body.user.email).toBe("admin.login@test.com");
+    expect(response.body.user.role).toBe("admin");
+  });
+
+  test("refuse la connexion si un champ obligatoire est manquant", async () => {
+    const response = await request(app).post("/api/auth/login").send({
+      email: "client.login@test.com",
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Email et mot de passe sont obligatoires.");
+  });
+
+  test("refuse la connexion si l'email est inconnu", async () => {
+    const response = await request(app).post("/api/auth/login").send({
+      email: "inconnu@test.com",
+      password: "Password123",
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Identifiants incorrects.");
+  });
+
+  test("refuse la connexion si le mot de passe est incorrect", async () => {
+    await request(app).post("/api/auth/register").send({
+      firstName: "Client",
+      lastName: "Erreur",
+      email: "wrong.password@test.com",
+      password: "Password123",
+    });
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "wrong.password@test.com",
+      password: "WrongPassword123",
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Identifiants incorrects.");
+  });
+
+  test("ne retourne jamais le password_hash après connexion", async () => {
+    await request(app).post("/api/auth/register").send({
+      firstName: "Secure",
+      lastName: "User",
+      email: "secure.login@test.com",
+      password: "Password123",
+    });
+
+    const response = await request(app).post("/api/auth/login").send({
+      email: "secure.login@test.com",
+      password: "Password123",
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.user.password_hash).toBeUndefined();
+  });
+});

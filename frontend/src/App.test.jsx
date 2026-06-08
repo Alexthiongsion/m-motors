@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi, describe, test, expect, beforeEach, afterEach } from "vitest";
 import App from "./App";
@@ -44,6 +44,35 @@ beforeEach(() => {
               email: "jean.dupont@test.com",
               role: "client",
             },
+          }),
+      });
+    }
+
+    if (options.method === "POST" && requestUrl.pathname === "/api/auth/login") {
+      const body = JSON.parse(options.body);
+
+      if (body.email === "client@test.com" && body.password === "Password123") {
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              message: "Connexion réussie.",
+              user: {
+                id: 2,
+                first_name: "Client",
+                last_name: "Test",
+                email: "client@test.com",
+                role: "client",
+              },
+            }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            message: "Identifiants incorrects.",
           }),
       });
     }
@@ -140,23 +169,96 @@ describe("App", () => {
   test("affiche le formulaire de création de compte", async () => {
     render(<App />);
 
-    expect(screen.getByRole("heading", { name: "Créer un compte" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Prénom")).toBeInTheDocument();
-    expect(screen.getByLabelText("Nom")).toBeInTheDocument();
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
-    expect(screen.getByLabelText("Mot de passe")).toBeInTheDocument();
+    const registerSection = screen
+      .getByRole("heading", { name: "Créer un compte" })
+      .closest("section");
+
+    expect(within(registerSection).getByLabelText("Prénom")).toBeInTheDocument();
+    expect(within(registerSection).getByLabelText("Nom")).toBeInTheDocument();
+    expect(within(registerSection).getByLabelText("Email")).toBeInTheDocument();
+    expect(within(registerSection).getByLabelText("Mot de passe")).toBeInTheDocument();
   });
 
   test("affiche une confirmation après création du compte", async () => {
     render(<App />);
 
-    await userEvent.type(screen.getByLabelText("Prénom"), "Jean");
-    await userEvent.type(screen.getByLabelText("Nom"), "Dupont");
-    await userEvent.type(screen.getByLabelText("Email"), "jean.dupont@test.com");
-    await userEvent.type(screen.getByLabelText("Mot de passe"), "Password123");
+    const registerSection = screen
+      .getByRole("heading", { name: "Créer un compte" })
+      .closest("section");
 
-    await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
+    await userEvent.type(within(registerSection).getByLabelText("Prénom"), "Jean");
+    await userEvent.type(within(registerSection).getByLabelText("Nom"), "Dupont");
+    await userEvent.type(
+      within(registerSection).getByLabelText("Email"),
+      "jean.dupont@test.com"
+    );
+    await userEvent.type(
+      within(registerSection).getByLabelText("Mot de passe"),
+      "Password123"
+    );
+
+    await userEvent.click(
+      within(registerSection).getByRole("button", { name: "Créer mon compte" })
+    );
 
     expect(await screen.findByText("Compte créé avec succès.")).toBeInTheDocument();
+  });
+
+  test("affiche le formulaire de connexion", async () => {
+    render(<App />);
+
+    const loginSection = screen
+      .getByRole("heading", { name: "Connexion" })
+      .closest("section");
+
+    expect(within(loginSection).getByLabelText("Email")).toBeInTheDocument();
+    expect(within(loginSection).getByLabelText("Mot de passe")).toBeInTheDocument();
+    expect(
+      within(loginSection).getByRole("button", { name: "Se connecter" })
+    ).toBeInTheDocument();
+  });
+
+  test("affiche l'espace connecté après connexion client", async () => {
+    render(<App />);
+
+    const loginSection = screen
+      .getByRole("heading", { name: "Connexion" })
+      .closest("section");
+
+    await userEvent.type(within(loginSection).getByLabelText("Email"), "client@test.com");
+    await userEvent.type(
+      within(loginSection).getByLabelText("Mot de passe"),
+      "Password123"
+    );
+
+    await userEvent.click(
+      within(loginSection).getByRole("button", { name: "Se connecter" })
+    );
+
+    expect(await screen.findByText("Espace connecté")).toBeInTheDocument();
+    expect(screen.getByText(/client@test.com/i)).toBeInTheDocument();
+    expect(screen.getByText("Accès client disponible.")).toBeInTheDocument();
+expect(localStorage.getItem("currentUser")).toContain('"role":"client"');
+    expect(localStorage.getItem("currentUser")).toContain("client@test.com");
+  });
+
+  test("affiche une erreur si les identifiants sont incorrects", async () => {
+    render(<App />);
+
+    const loginSection = screen
+      .getByRole("heading", { name: "Connexion" })
+      .closest("section");
+
+    await userEvent.type(within(loginSection).getByLabelText("Email"), "wrong@test.com");
+    await userEvent.type(
+      within(loginSection).getByLabelText("Mot de passe"),
+      "WrongPassword123"
+    );
+
+    await userEvent.click(
+      within(loginSection).getByRole("button", { name: "Se connecter" })
+    );
+
+    expect(await screen.findByText("Identifiants incorrects.")).toBeInTheDocument();
   });
 });

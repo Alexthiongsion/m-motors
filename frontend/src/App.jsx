@@ -6,6 +6,7 @@ import OfferTypeFilter from "./components/OfferTypeFilter";
 import RegisterForm from "./components/RegisterForm";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
+import LoginForm from "./components/LoginForm";
 
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -14,6 +15,10 @@ export default function App() {
   const [selectedJourney, setSelectedJourney] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentUser, setCurrentUser] = useState(() => {
+  const storedUser = localStorage.getItem("currentUser");
+  return storedUser ? JSON.parse(storedUser) : null;
+});
 
   async function loadVehicles(searchValue = search, offerType = selectedOfferType) {
     try {
@@ -53,6 +58,11 @@ export default function App() {
     setSelectedJourney(journey);
   }
 
+  function handleLogout() {
+  localStorage.removeItem("currentUser");
+  setCurrentUser(null);
+}
+
   return (
     <main className="page">
       <section className="hero">
@@ -89,7 +99,38 @@ export default function App() {
         <VehicleList vehicles={vehicles} onJourneySelect={handleJourneySelect} />
       )}
 
-      <RegisterForm />
+      <section className="auth-area">
+  <RegisterForm />
+
+  {currentUser ? (
+    <section className="connected-user">
+      <h2>Espace connecté</h2>
+      <p>
+        Connecté en tant que <strong>{currentUser.email}</strong>
+      </p>
+      <p>
+        Rôle : <strong>{currentUser.role}</strong>
+      </p>
+
+      {currentUser.role === "admin" ? (
+        <p>Accès administrateur disponible.</p>
+      ) : (
+        <p>Accès client disponible.</p>
+      )}
+
+      <button type="button" onClick={handleLogout}>
+        Se déconnecter
+      </button>
+    </section>
+  ) : (
+    <>
+      <LoginForm onLogin={setCurrentUser} />
+      <p className="protected-message">
+        Connectez-vous pour accéder à votre espace personnel.
+      </p>
+    </>
+  )}
+</section>
     </main>
   );
 }

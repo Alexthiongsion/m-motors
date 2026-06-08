@@ -396,7 +396,7 @@ describe("App", () => {
     const section = applicationsSection.closest("section");
 
     expect(within(section).getByText("Renault Clio")).toBeInTheDocument();
-    expect(within(section).getByText(/en_attente/i)).toBeInTheDocument();
+    expect(within(section).getByText(/En attente/i)).toBeInTheDocument();
     expect(within(section).getByText("Demande de test.")).toBeInTheDocument();
   });
 });

@@ -213,6 +213,83 @@ describe("GET /api/applications/user/:userId", () => {
     expect(response.body[0].status).toBe("en_attente");
   });
 
+  test("retourne le statut actuel d'un dossier client", async () => {
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+      message: "Demande en cours.",
+    });
+
+    await pool.query("UPDATE applications SET status = $1 WHERE id = $2", [
+      "en_cours",
+      createdApplication.body.application.id,
+    ]);
+
+    const response = await request(app).get(`/api/applications/user/${user.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].status).toBe("en_cours");
+  });
+
+  test("ne retourne pas les dossiers d'un autre client", async () => {
+    const user = await createTestUser();
+    const passwordHash = await bcrypt.hash("Password123", 10);
+
+    const otherUserResult = await pool.query(
+      `
+      INSERT INTO users (first_name, last_name, email, password_hash, role)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+      `,
+      [
+        "Autre",
+        "Client",
+        "other-client@application.test.com",
+        passwordHash,
+        "client",
+      ]
+    );
+
+    const otherUser = otherUserResult.rows[0];
+    const vehicle = await createTestVehicle("purchase");
+    const otherVehicle = await createTestVehicle("purchase");
+
+    await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    await request(app).post("/api/applications").send({
+      userId: otherUser.id,
+      vehicleId: otherVehicle.id,
+      offerType: "purchase",
+      phone: "0611111111",
+    });
+
+    const response = await request(app).get(`/api/applications/user/${user.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].user_id).toBe(user.id);
+  });
+
+  test("retourne un tableau vide si le client n'a aucun dossier", async () => {
+    const user = await createTestUser();
+
+    const response = await request(app).get(`/api/applications/user/${user.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual([]);
+  });
+
   test("refuse la récupération si l'utilisateur est introuvable", async () => {
     const response = await request(app).get("/api/applications/user/999999");
 

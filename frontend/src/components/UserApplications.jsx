@@ -1,6 +1,28 @@
 import { useEffect, useState } from "react";
 import { fetchUserApplications } from "../services/applicationService";
 
+export function getApplicationStatusLabel(status) {
+  const labels = {
+    en_attente: "En attente",
+    en_cours: "En cours d’analyse",
+    valide: "Validé",
+    refuse: "Refusé",
+  };
+
+  return labels[status] || "Statut inconnu";
+}
+
+export function getApplicationStatusClassName(status) {
+  const classNames = {
+    en_attente: "status-badge--pending",
+    en_cours: "status-badge--progress",
+    valide: "status-badge--approved",
+    refuse: "status-badge--rejected",
+  };
+
+  return classNames[status] || "status-badge--unknown";
+}
+
 export default function UserApplications({ currentUser, refreshKey }) {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -50,15 +72,25 @@ export default function UserApplications({ currentUser, refreshKey }) {
               <h3>
                 {application.brand} {application.model}
               </h3>
+
               <p>
                 Type :{" "}
                 <strong>
                   {application.offer_type === "purchase" ? "Achat" : "Location"}
                 </strong>
               </p>
-              <p>
-                Statut : <strong>{application.status}</strong>
+
+              <p className="application-status">
+                Statut :{" "}
+                <span
+                  className={`status-badge ${getApplicationStatusClassName(
+                    application.status
+                  )}`}
+                >
+                  {getApplicationStatusLabel(application.status)}
+                </span>
               </p>
+
               {application.message && <p>{application.message}</p>}
             </article>
           ))}

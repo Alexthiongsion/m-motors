@@ -10,6 +10,7 @@ import UserApplications from "./components/UserApplications";
 import AdminVehicleManager from "./components/AdminVehicleManager";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
+import AdminApplicationManager from "./components/AdminApplicationManager";
 
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
@@ -152,10 +153,14 @@ export default function App() {
                 />
               </div>
             ) : (
-              <AdminVehicleManager
-                currentUser={currentUser}
-                onVehiclesChanged={handleVehiclesChanged}
-              />
+              <div className="admin-dashboard">
+            <AdminVehicleManager
+              currentUser={currentUser}
+              onVehiclesChanged={handleVehiclesChanged}
+            />
+
+            <AdminApplicationManager currentUser={currentUser} />
+          </div>
             )}
           </section>
         ) : (

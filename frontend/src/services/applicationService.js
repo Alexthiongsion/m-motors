@@ -29,3 +29,31 @@ export async function fetchUserApplications(userId) {
 
   return data;
 }
+
+export async function fetchAdminApplications(adminUserId) {
+  const response = await fetch(
+    `${API_URL}/api/applications/admin?adminUserId=${adminUserId}`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors du chargement des dossiers administrateur.");
+  }
+
+  return data;
+}
+
+export async function fetchAdminApplicationDetail(adminUserId, applicationId) {
+  const response = await fetch(
+    `${API_URL}/api/applications/admin/${applicationId}?adminUserId=${adminUserId}`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors du chargement du dossier.");
+  }
+
+  return data;
+}

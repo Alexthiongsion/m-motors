@@ -9,7 +9,7 @@ let createdVehicleId;
 beforeAll(async () => {
   await pool.query(`
     DELETE FROM vehicles
-    WHERE brand = 'TestAdmin'
+    WHERE brand = 'AdminVehicle'
   `);
 
   const adminResult = await pool.query(
@@ -39,7 +39,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await pool.query(`
     DELETE FROM vehicles
-    WHERE brand = 'TestAdmin'
+    WHERE brand = 'AdminVehicle'
   `);
 
   await pool.query(`
@@ -134,7 +134,7 @@ describe("POST /api/vehicles", () => {
       .post("/api/vehicles")
       .send({
         adminUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "Creation",
         price: 19900,
         offerType: "both",
@@ -144,7 +144,7 @@ describe("POST /api/vehicles", () => {
 
     expect(response.status).toBe(201);
     expect(response.body.message).toBe("Véhicule créé avec succès.");
-    expect(response.body.vehicle.brand).toBe("TestAdmin");
+    expect(response.body.vehicle.brand).toBe("AdminVehicle");
     expect(response.body.vehicle.model).toBe("Creation");
     expect(response.body.vehicle.offer_type).toBe("both");
     expect(response.body.vehicle.is_available).toBe(false);
@@ -157,7 +157,7 @@ describe("POST /api/vehicles", () => {
       .post("/api/vehicles")
       .send({
         adminUserId: clientUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "Refus",
         price: 15000,
         offerType: "purchase",
@@ -174,7 +174,7 @@ describe("POST /api/vehicles", () => {
       .post("/api/vehicles")
       .send({
         adminUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         price: 15000,
         offerType: "purchase",
         isAvailable: true,
@@ -191,7 +191,7 @@ describe("POST /api/vehicles", () => {
       .post("/api/vehicles")
       .send({
         adminUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "Invalid",
         price: 15000,
         offerType: "invalid",
@@ -209,7 +209,7 @@ describe("PUT /api/vehicles/:id", () => {
       .put(`/api/vehicles/${createdVehicleId}`)
       .send({
         adminUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "Modification",
         price: 21000,
         offerType: "both",
@@ -229,7 +229,7 @@ describe("PUT /api/vehicles/:id", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
-    expect(response.body[0].brand).toBe("TestAdmin");
+    expect(response.body[0].brand).toBe("AdminVehicle");
     expect(response.body[0].model).toBe("Modification");
     expect(response.body[0].is_available).toBe(true);
   });
@@ -239,7 +239,7 @@ describe("PUT /api/vehicles/:id", () => {
       .put(`/api/vehicles/${createdVehicleId}`)
       .send({
         adminUserId: clientUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "ClientRefus",
         price: 21000,
         offerType: "purchase",
@@ -256,7 +256,7 @@ describe("PUT /api/vehicles/:id", () => {
       .put("/api/vehicles/999999")
       .send({
         adminUserId,
-        brand: "TestAdmin",
+        brand: "AdminVehicle",
         model: "Introuvable",
         price: 21000,
         offerType: "purchase",

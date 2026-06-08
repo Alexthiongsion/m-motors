@@ -480,3 +480,52 @@ h1 {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+.admin-dashboard {
+  display: grid;
+  gap: 2rem;
+}
+
+.admin-application-manager {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.admin-application-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-application-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.admin-application-item h3 {
+  margin: 0 0 0.5rem;
+}
+
+.admin-application-item p {
+  margin: 0.25rem 0;
+}
+
+.admin-application-detail {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid #cfd8dc;
+  border-radius: 12px;
+  background: #f8fbfc;
+}
+
+.admin-application-detail h3 {
+  margin-top: 0;
+}

@@ -2,20 +2,23 @@ import { useEffect, useState } from "react";
 import VehicleSearchBar from "./components/VehicleSearchBar";
 import VehicleList from "./components/VehicleList";
 import EmptyState from "./components/EmptyState";
+import OfferTypeFilter from "./components/OfferTypeFilter";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
 
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
   const [search, setSearch] = useState("");
+  const [selectedOfferType, setSelectedOfferType] = useState("all");
+  const [selectedJourney, setSelectedJourney] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadVehicles(searchValue = "") {
+  async function loadVehicles(searchValue = search, offerType = selectedOfferType) {
     try {
       setLoading(true);
       setError("");
-      const data = await fetchVehicles(searchValue);
+      const data = await fetchVehicles(searchValue, offerType);
       setVehicles(data);
     } catch {
       setError("Une erreur est survenue lors du chargement des véhicules.");
@@ -25,12 +28,28 @@ export default function App() {
   }
 
   useEffect(() => {
-    loadVehicles();
+    loadVehicles("", "all");
   }, []);
 
   function handleSubmit(event) {
     event.preventDefault();
-    loadVehicles(search);
+    loadVehicles(search, selectedOfferType);
+  }
+
+  function handleOfferTypeChange(offerType) {
+    setSelectedOfferType(offerType);
+    loadVehicles(search, offerType);
+  }
+
+  function handleJourneySelect(vehicle) {
+    const journey = {
+      vehicleId: vehicle.id,
+      vehicleName: `${vehicle.brand} ${vehicle.model}`,
+      type: vehicle.offer_type,
+    };
+
+    localStorage.setItem("selectedJourney", JSON.stringify(journey));
+    setSelectedJourney(journey);
   }
 
   return (
@@ -47,10 +66,27 @@ export default function App() {
         onSubmit={handleSubmit}
       />
 
+      <OfferTypeFilter
+        selectedOfferType={selectedOfferType}
+        onOfferTypeChange={handleOfferTypeChange}
+      />
+
+      {selectedJourney && (
+        <p className="journey-confirmation">
+          Parcours sélectionné :{" "}
+          <strong>
+            {selectedJourney.type === "purchase" ? "achat" : "location"}
+          </strong>{" "}
+          pour {selectedJourney.vehicleName}.
+        </p>
+      )}
+
       {loading && <p>Chargement des véhicules...</p>}
       {error && <p className="error">{error}</p>}
       {!loading && !error && vehicles.length === 0 && <EmptyState />}
-      {!loading && !error && vehicles.length > 0 && <VehicleList vehicles={vehicles} />}
+      {!loading && !error && vehicles.length > 0 && (
+        <VehicleList vehicles={vehicles} onJourneySelect={handleJourneySelect} />
+      )}
     </main>
   );
 }

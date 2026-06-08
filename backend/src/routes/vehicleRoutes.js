@@ -6,6 +6,9 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   try {
     const search = req.query.search?.trim();
+    const offerType = req.query.offerType?.trim();
+
+    const values = [];
 
     let query = `
       SELECT id, brand, model, price, offer_type, is_available, image_url
@@ -13,11 +16,20 @@ router.get("/", async (req, res) => {
       WHERE is_available = true
     `;
 
-    const values = [];
-
     if (search) {
-      query += ` AND (brand ILIKE $1 OR model ILIKE $1)`;
       values.push(`%${search}%`);
+      query += ` AND (brand ILIKE $${values.length} OR model ILIKE $${values.length})`;
+    }
+
+    if (offerType) {
+      if (!["purchase", "rental"].includes(offerType)) {
+        return res.status(400).json({
+          message: "Le type d'offre demandé est invalide.",
+        });
+      }
+
+      values.push(offerType);
+      query += ` AND offer_type = $${values.length}`;
     }
 
     query += ` ORDER BY brand ASC, model ASC`;

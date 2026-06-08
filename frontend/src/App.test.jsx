@@ -25,6 +25,22 @@ const vehicles = [
   },
 ];
 
+const applications = [
+  {
+    id: 1,
+    user_id: 2,
+    vehicle_id: 1,
+    offer_type: "purchase",
+    phone: "0600000000",
+    message: "Demande de test.",
+    status: "en_attente",
+    brand: "Renault",
+    model: "Clio",
+    price: 12000,
+    image_url: null,
+  },
+];
+
 beforeEach(() => {
   localStorage.clear();
 
@@ -74,6 +90,24 @@ beforeEach(() => {
           Promise.resolve({
             message: "Identifiants incorrects.",
           }),
+      });
+    }
+
+    if (options.method === "POST" && requestUrl.pathname === "/api/applications") {
+      return Promise.resolve({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            message: "Dossier déposé avec succès.",
+            application: applications[0],
+          }),
+      });
+    }
+
+    if (requestUrl.pathname === "/api/applications/user/2") {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve(applications),
       });
     }
 
@@ -238,7 +272,7 @@ describe("App", () => {
     expect(await screen.findByText("Espace connecté")).toBeInTheDocument();
     expect(screen.getByText(/client@test.com/i)).toBeInTheDocument();
     expect(screen.getByText("Accès client disponible.")).toBeInTheDocument();
-expect(localStorage.getItem("currentUser")).toContain('"role":"client"');
+    expect(localStorage.getItem("currentUser")).toContain('"role":"client"');
     expect(localStorage.getItem("currentUser")).toContain("client@test.com");
   });
 
@@ -260,5 +294,109 @@ expect(localStorage.getItem("currentUser")).toContain('"role":"client"');
     );
 
     expect(await screen.findByText("Identifiants incorrects.")).toBeInTheDocument();
+  });
+
+  test("affiche un message si l'utilisateur n'est pas connecté", async () => {
+    render(<App />);
+
+    expect(
+      await screen.findByText("Connectez-vous pour accéder à votre espace personnel.")
+    ).toBeInTheDocument();
+  });
+
+  test("affiche un message si aucun parcours n'est sélectionné", async () => {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
+        id: 2,
+        email: "client@test.com",
+        role: "client",
+      })
+    );
+
+    render(<App />);
+
+    expect(
+      await screen.findByText("Sélectionnez d’abord un véhicule et un parcours achat/location.")
+    ).toBeInTheDocument();
+  });
+
+  test("affiche le formulaire de dépôt si le client est connecté avec un parcours sélectionné", async () => {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
+        id: 2,
+        email: "client@test.com",
+        role: "client",
+      })
+    );
+
+    localStorage.setItem(
+      "selectedJourney",
+      JSON.stringify({
+        vehicleId: 1,
+        vehicleName: "Renault Clio",
+        type: "purchase",
+      })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Déposer un dossier" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Téléphone")).toBeInTheDocument();
+    expect(screen.getByLabelText("Message")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Déposer le dossier" })).toBeInTheDocument();
+  });
+
+  test("affiche une confirmation après dépôt de dossier", async () => {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
+        id: 2,
+        email: "client@test.com",
+        role: "client",
+      })
+    );
+
+    localStorage.setItem(
+      "selectedJourney",
+      JSON.stringify({
+        vehicleId: 1,
+        vehicleName: "Renault Clio",
+        type: "purchase",
+      })
+    );
+
+    render(<App />);
+
+    await userEvent.type(await screen.findByLabelText("Téléphone"), "0600000000");
+    await userEvent.type(screen.getByLabelText("Message"), "Demande de test.");
+
+    await userEvent.click(screen.getByRole("button", { name: "Déposer le dossier" }));
+
+    expect(await screen.findByText("Dossier déposé avec succès.")).toBeInTheDocument();
+  });
+
+  test("affiche les dossiers du client connecté", async () => {
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify({
+        id: 2,
+        email: "client@test.com",
+        role: "client",
+      })
+    );
+
+    render(<App />);
+
+    const applicationsSection = await screen.findByRole("heading", {
+      name: "Mes dossiers",
+    });
+
+    const section = applicationsSection.closest("section");
+
+    expect(within(section).getByText("Renault Clio")).toBeInTheDocument();
+    expect(within(section).getByText(/en_attente/i)).toBeInTheDocument();
+    expect(within(section).getByText("Demande de test.")).toBeInTheDocument();
   });
 });

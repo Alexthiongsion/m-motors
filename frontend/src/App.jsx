@@ -4,21 +4,27 @@ import VehicleList from "./components/VehicleList";
 import EmptyState from "./components/EmptyState";
 import OfferTypeFilter from "./components/OfferTypeFilter";
 import RegisterForm from "./components/RegisterForm";
+import LoginForm from "./components/LoginForm";
+import ApplicationForm from "./components/ApplicationForm";
+import UserApplications from "./components/UserApplications";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
-import LoginForm from "./components/LoginForm";
 
 export default function App() {
   const [vehicles, setVehicles] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedOfferType, setSelectedOfferType] = useState("all");
-  const [selectedJourney, setSelectedJourney] = useState(null);
+  const [selectedJourney, setSelectedJourney] = useState(() => {
+    const storedJourney = localStorage.getItem("selectedJourney");
+    return storedJourney ? JSON.parse(storedJourney) : null;
+  });
+  const [applicationRefreshKey, setApplicationRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [currentUser, setCurrentUser] = useState(() => {
-  const storedUser = localStorage.getItem("currentUser");
-  return storedUser ? JSON.parse(storedUser) : null;
-});
+    const storedUser = localStorage.getItem("currentUser");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
   async function loadVehicles(searchValue = search, offerType = selectedOfferType) {
     try {
@@ -58,10 +64,14 @@ export default function App() {
     setSelectedJourney(journey);
   }
 
+  function handleApplicationCreated() {
+    setApplicationRefreshKey((currentValue) => currentValue + 1);
+  }
+
   function handleLogout() {
-  localStorage.removeItem("currentUser");
-  setCurrentUser(null);
-}
+    localStorage.removeItem("currentUser");
+    setCurrentUser(null);
+  }
 
   return (
     <main className="page">
@@ -100,37 +110,61 @@ export default function App() {
       )}
 
       <section className="auth-area">
-  <RegisterForm />
+        {currentUser ? (
+          <section className="connected-user">
+            <h2>Espace connecté</h2>
 
-  {currentUser ? (
-    <section className="connected-user">
-      <h2>Espace connecté</h2>
-      <p>
-        Connecté en tant que <strong>{currentUser.email}</strong>
-      </p>
-      <p>
-        Rôle : <strong>{currentUser.role}</strong>
-      </p>
+            <div className="user-summary">
+              <p>
+                Connecté en tant que <strong>{currentUser.email}</strong>
+              </p>
+              <p>
+                Rôle : <strong>{currentUser.role}</strong>
+              </p>
+            </div>
 
-      {currentUser.role === "admin" ? (
-        <p>Accès administrateur disponible.</p>
-      ) : (
-        <p>Accès client disponible.</p>
-      )}
+            {currentUser.role === "admin" ? (
+              <p className="protected-message">Accès administrateur disponible.</p>
+            ) : (
+              <p className="protected-message">Accès client disponible.</p>
+            )}
 
-      <button type="button" onClick={handleLogout}>
-        Se déconnecter
-      </button>
-    </section>
-  ) : (
-    <>
-      <LoginForm onLogin={setCurrentUser} />
-      <p className="protected-message">
-        Connectez-vous pour accéder à votre espace personnel.
-      </p>
-    </>
-  )}
-</section>
+            <button type="button" onClick={handleLogout}>
+              Se déconnecter
+            </button>
+
+            {currentUser.role === "client" ? (
+              <div className="client-dashboard">
+                <ApplicationForm
+                  currentUser={currentUser}
+                  selectedJourney={selectedJourney}
+                  onApplicationCreated={handleApplicationCreated}
+                />
+
+                <UserApplications
+                  currentUser={currentUser}
+                  refreshKey={applicationRefreshKey}
+                />
+              </div>
+            ) : (
+              <p className="protected-message">
+                Le dépôt de dossier est réservé aux comptes clients.
+              </p>
+            )}
+          </section>
+        ) : (
+          <div className="auth-grid">
+            <RegisterForm />
+
+            <section className="login-panel">
+              <LoginForm onLogin={setCurrentUser} />
+              <p className="protected-message">
+                Connectez-vous pour accéder à votre espace personnel.
+              </p>
+            </section>
+          </div>
+        )}
+      </section>
     </main>
   );
 }

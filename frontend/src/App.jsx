@@ -3,6 +3,7 @@ import VehicleSearchBar from "./components/VehicleSearchBar";
 import VehicleList from "./components/VehicleList";
 import EmptyState from "./components/EmptyState";
 import OfferTypeFilter from "./components/OfferTypeFilter";
+import RegisterForm from "./components/RegisterForm";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
 
@@ -87,6 +88,8 @@ export default function App() {
       {!loading && !error && vehicles.length > 0 && (
         <VehicleList vehicles={vehicles} onJourneySelect={handleJourneySelect} />
       )}
+
+      <RegisterForm />
     </main>
   );
 }

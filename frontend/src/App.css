@@ -163,3 +163,52 @@ h1 {
   color: #065f46;
   font-weight: 500;
 }
+.register-section {
+  margin-top: 3rem;
+  padding: 2rem;
+  border-radius: 1rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.register-section h2 {
+  margin-top: 0;
+}
+
+.register-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.register-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.register-form input {
+  padding: 0.8rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.75rem;
+  font: inherit;
+}
+
+.register-form button {
+  border: none;
+  background: #111827;
+  color: #ffffff;
+  padding: 0.9rem 1rem;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.success {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 500;
+}

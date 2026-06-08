@@ -22,3 +22,57 @@ export async function fetchVehicles(search = "", offerType = "all") {
 
   return response.json();
 }
+
+export async function fetchAdminVehicles(adminUserId) {
+  const response = await fetch(
+    `${API_URL}/api/vehicles/admin?adminUserId=${adminUserId}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Erreur lors du chargement des véhicules administrateur");
+  }
+
+  return response.json();
+}
+
+export async function createVehicle(adminUserId, vehicleData) {
+  const response = await fetch(`${API_URL}/api/vehicles`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      adminUserId,
+      ...vehicleData,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors de la création du véhicule");
+  }
+
+  return data;
+}
+
+export async function updateVehicle(adminUserId, vehicleId, vehicleData) {
+  const response = await fetch(`${API_URL}/api/vehicles/${vehicleId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      adminUserId,
+      ...vehicleData,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors de la modification du véhicule");
+  }
+
+  return data;
+}

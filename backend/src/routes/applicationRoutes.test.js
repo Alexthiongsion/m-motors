@@ -23,7 +23,7 @@ beforeAll(async () => {
       brand VARCHAR(100) NOT NULL,
       model VARCHAR(100) NOT NULL,
       price INTEGER NOT NULL CHECK (price >= 0),
-      offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental')),
+      offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental', 'both')),
       is_available BOOLEAN NOT NULL DEFAULT true,
       image_url TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -107,6 +107,27 @@ describe("POST /api/applications", () => {
     expect(response.body.application.offer_type).toBe("purchase");
     expect(response.body.application.status).toBe("en_attente");
   });
+
+
+  test("crée un dossier achat pour un véhicule disponible en achat et location", async () => {
+  const user = await createTestUser();
+  const vehicle = await createTestVehicle("both");
+
+  const response = await request(app).post("/api/applications").send({
+    userId: user.id,
+    vehicleId: vehicle.id,
+    offerType: "purchase",
+    phone: "0600000000",
+    message: "Je souhaite acheter ce véhicule.",
+  });
+
+  expect(response.status).toBe(201);
+  expect(response.body.message).toBe("Dossier déposé avec succès.");
+  expect(response.body.application.user_id).toBe(user.id);
+  expect(response.body.application.vehicle_id).toBe(vehicle.id);
+  expect(response.body.application.offer_type).toBe("purchase");
+  expect(response.body.application.status).toBe("en_attente");
+});
 
   test("refuse la création si un champ obligatoire est manquant", async () => {
     const response = await request(app).post("/api/applications").send({

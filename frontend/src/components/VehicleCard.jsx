@@ -1,11 +1,13 @@
 export default function VehicleCard({ vehicle, onJourneySelect }) {
   const isPurchase = vehicle.offer_type === "purchase";
-  const offerLabel = isPurchase ? "Achat" : "Location";
-  const actionLabel = isPurchase ? "Acheter" : "Louer";
+  const isRental = vehicle.offer_type === "rental";
+  const isBoth = vehicle.offer_type === "both";
 
-  const priceLabel = isPurchase
-    ? `${vehicle.price.toLocaleString("fr-FR")} €`
-    : `${vehicle.price.toLocaleString("fr-FR")} € / mois`;
+  const offerLabel = isBoth ? "Achat et location" : isPurchase ? "Achat" : "Location";
+
+  const priceLabel = isRental
+    ? `${vehicle.price.toLocaleString("fr-FR")} € / mois`
+    : `${vehicle.price.toLocaleString("fr-FR")} €`;
 
   return (
     <article className="vehicle-card">
@@ -24,13 +26,33 @@ export default function VehicleCard({ vehicle, onJourneySelect }) {
         </h2>
         <p className="price">{priceLabel}</p>
 
-        <button
-          type="button"
-          className="journey-button"
-          onClick={() => onJourneySelect(vehicle)}
-        >
-          {actionLabel}
-        </button>
+        {isBoth ? (
+          <div className="journey-actions">
+            <button
+              type="button"
+              className="journey-button"
+              onClick={() => onJourneySelect(vehicle, "purchase")}
+            >
+              Acheter
+            </button>
+
+            <button
+              type="button"
+              className="journey-button"
+              onClick={() => onJourneySelect(vehicle, "rental")}
+            >
+              Louer
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="journey-button"
+            onClick={() => onJourneySelect(vehicle, vehicle.offer_type)}
+          >
+            {isPurchase ? "Acheter" : "Louer"}
+          </button>
+        )}
       </div>
     </article>
   );

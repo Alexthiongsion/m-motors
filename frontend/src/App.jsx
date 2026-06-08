@@ -7,6 +7,7 @@ import RegisterForm from "./components/RegisterForm";
 import LoginForm from "./components/LoginForm";
 import ApplicationForm from "./components/ApplicationForm";
 import UserApplications from "./components/UserApplications";
+import AdminVehicleManager from "./components/AdminVehicleManager";
 import { fetchVehicles } from "./services/vehicleService";
 import "./App.css";
 
@@ -53,19 +54,23 @@ export default function App() {
     loadVehicles(search, offerType);
   }
 
-  function handleJourneySelect(vehicle) {
-    const journey = {
-      vehicleId: vehicle.id,
-      vehicleName: `${vehicle.brand} ${vehicle.model}`,
-      type: vehicle.offer_type,
-    };
+  function handleJourneySelect(vehicle, selectedType = vehicle.offer_type) {
+  const journey = {
+    vehicleId: vehicle.id,
+    vehicleName: `${vehicle.brand} ${vehicle.model}`,
+    type: selectedType,
+  };
 
-    localStorage.setItem("selectedJourney", JSON.stringify(journey));
-    setSelectedJourney(journey);
-  }
+  localStorage.setItem("selectedJourney", JSON.stringify(journey));
+  setSelectedJourney(journey);
+}
 
   function handleApplicationCreated() {
     setApplicationRefreshKey((currentValue) => currentValue + 1);
+  }
+
+  function handleVehiclesChanged() {
+    loadVehicles(search, selectedOfferType);
   }
 
   function handleLogout() {
@@ -147,9 +152,10 @@ export default function App() {
                 />
               </div>
             ) : (
-              <p className="protected-message">
-                Le dépôt de dossier est réservé aux comptes clients.
-              </p>
+              <AdminVehicleManager
+                currentUser={currentUser}
+                onVehiclesChanged={handleVehiclesChanged}
+              />
             )}
           </section>
         ) : (

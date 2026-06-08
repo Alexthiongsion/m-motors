@@ -49,11 +49,14 @@ router.post("/", async (req, res) => {
       });
     }
 
-    if (vehicle.offer_type !== offerType) {
-      return res.status(400).json({
-        message: "Le type de demande ne correspond pas à l'offre du véhicule.",
-      });
-    }
+   const isOfferTypeCompatible =
+  vehicle.offer_type === offerType || vehicle.offer_type === "both";
+
+if (!isOfferTypeCompatible) {
+  return res.status(400).json({
+    message: "Le type de demande ne correspond pas à l'offre du véhicule.",
+  });
+}
 
     const applicationResult = await pool.query(
       `

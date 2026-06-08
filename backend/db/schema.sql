@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS vehicles (
   brand VARCHAR(100) NOT NULL,
   model VARCHAR(100) NOT NULL,
   price INTEGER NOT NULL CHECK (price >= 0),
-  offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental')),
+  offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental', 'both')),
   is_available BOOLEAN NOT NULL DEFAULT true,
   image_url TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

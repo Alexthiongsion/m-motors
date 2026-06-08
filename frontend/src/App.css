@@ -395,3 +395,88 @@ h1 {
   background: #e5e7eb;
   color: #374151;
 }
+
+.admin-vehicle-manager {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.admin-helper {
+  margin-bottom: 1rem;
+  color: #555;
+}
+
+.admin-vehicle-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-vehicle-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.admin-vehicle-form input,
+.admin-vehicle-form select {
+  padding: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  font: inherit;
+}
+
+.checkbox-field {
+  display: flex !important;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.5rem !important;
+}
+
+.checkbox-field input {
+  width: auto;
+}
+
+.admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.admin-vehicle-list {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.admin-vehicle-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.admin-vehicle-item h4 {
+  margin: 0 0 0.5rem;
+}
+
+.admin-vehicle-item p {
+  margin: 0.25rem 0;
+}
+
+.success {
+  color: #167c3a;
+  font-weight: 600;
+}
+
+.journey-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

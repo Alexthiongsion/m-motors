@@ -8,7 +8,7 @@ Projet Bloc 3 — Développement d'une solution digitale web pour M-Motors.
 - Back-end : Node.js / Express
 - Base de données : PostgreSQL
 - Versioning : Git / GitHub
-- Tests : Vitest, React Testing Library, Jest, Supertest
+- Tests : Vitest, React Testing Library, Jest, Supertest, Playwright
 
 ## Structure
 

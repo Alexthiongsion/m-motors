@@ -1,7 +1,42 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const pool = require("../db");
 
 const router = express.Router();
+
+const documentsUploadDir = path.join(__dirname, "../../uploads/documents");
+
+if (!fs.existsSync(documentsUploadDir)) {
+  fs.mkdirSync(documentsUploadDir, { recursive: true });
+}
+
+const allowedDocumentMimeTypes = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+];
+
+const storage = multer.diskStorage({
+  destination: documentsUploadDir,
+  filename: (req, file, callback) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const extension = path.extname(file.originalname);
+    callback(null, `document-${uniqueSuffix}${extension}`);
+  },
+});
+
+const uploadDocument = multer({
+  storage,
+  fileFilter: (req, file, callback) => {
+    if (!allowedDocumentMimeTypes.includes(file.mimetype)) {
+      return callback(new Error("FORMAT_INVALIDE"));
+    }
+
+    callback(null, true);
+  },
+});
 
 async function findAdminUser(adminUserId) {
   if (!adminUserId) {
@@ -234,6 +269,144 @@ router.patch("/admin/:applicationId/status", async (req, res) => {
   }
 });
 
+router.post(
+  "/:applicationId/documents",
+  uploadDocument.single("document"),
+  async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const { userId } = req.body;
+
+      if (!userId) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+
+        return res.status(400).json({
+          message: "L'utilisateur doit être renseigné.",
+        });
+      }
+
+      const applicationResult = await pool.query(
+        "SELECT id, user_id FROM applications WHERE id = $1",
+        [applicationId]
+      );
+
+      if (applicationResult.rows.length === 0) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+
+        return res.status(404).json({
+          message: "Dossier introuvable.",
+        });
+      }
+
+      const application = applicationResult.rows[0];
+
+      if (Number(application.user_id) !== Number(userId)) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+
+        return res.status(403).json({
+          message: "Ce dossier n'appartient pas à cet utilisateur.",
+        });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({
+          message: "Aucun document n'a été envoyé.",
+        });
+      }
+
+      const documentResult = await pool.query(
+        `
+        INSERT INTO application_documents (
+          application_id,
+          original_name,
+          file_name,
+          mime_type,
+          file_path,
+          file_size
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING id, application_id, original_name, file_name, mime_type, file_path, file_size, created_at
+        `,
+        [
+          applicationId,
+          req.file.originalname,
+          req.file.filename,
+          req.file.mimetype,
+          req.file.path,
+          req.file.size,
+        ]
+      );
+
+      res.status(201).json({
+        message: "Document envoyé avec succès.",
+        document: documentResult.rows[0],
+      });
+    } catch (error) {
+      console.error("Error uploading document:", error);
+
+      res.status(500).json({
+        message: "Une erreur est survenue lors de l'envoi du document.",
+      });
+    }
+  }
+);
+
+router.get("/:applicationId/documents", async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({
+        message: "L'utilisateur doit être renseigné.",
+      });
+    }
+
+    const applicationResult = await pool.query(
+      "SELECT id, user_id FROM applications WHERE id = $1",
+      [applicationId]
+    );
+
+    if (applicationResult.rows.length === 0) {
+      return res.status(404).json({
+        message: "Dossier introuvable.",
+      });
+    }
+
+    const application = applicationResult.rows[0];
+
+    if (Number(application.user_id) !== Number(userId)) {
+      return res.status(403).json({
+        message: "Ce dossier n'appartient pas à cet utilisateur.",
+      });
+    }
+
+    const documentsResult = await pool.query(
+      `
+      SELECT id, application_id, original_name, file_name, mime_type, file_size, created_at
+      FROM application_documents
+      WHERE application_id = $1
+      ORDER BY created_at DESC
+      `,
+      [applicationId]
+    );
+
+    res.status(200).json(documentsResult.rows);
+  } catch (error) {
+    console.error("Error fetching documents:", error);
+
+    res.status(500).json({
+      message: "Une erreur est survenue lors du chargement des documents.",
+    });
+  }
+});
+
 router.get("/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -278,6 +451,16 @@ router.get("/user/:userId", async (req, res) => {
       message: "Une erreur est survenue lors du chargement des dossiers.",
     });
   }
+});
+
+router.use((error, req, res, next) => {
+  if (error.message === "FORMAT_INVALIDE") {
+    return res.status(400).json({
+      message: "Format de document non autorisé.",
+    });
+  }
+
+  next(error);
 });
 
 module.exports = router;

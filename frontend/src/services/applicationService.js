@@ -81,3 +81,40 @@ export async function updateApplicationStatus(adminUserId, applicationId, status
 
   return data;
 }
+
+export async function uploadApplicationDocument(applicationId, userId, file) {
+  const formData = new FormData();
+
+  formData.append("userId", userId);
+  formData.append("document", file);
+
+  const response = await fetch(
+    `${API_URL}/api/applications/${applicationId}/documents`,
+    {
+      method: "POST",
+      body: formData,
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors de l'envoi du document.");
+  }
+
+  return data;
+}
+
+export async function fetchApplicationDocuments(applicationId, userId) {
+  const response = await fetch(
+    `${API_URL}/api/applications/${applicationId}/documents?userId=${userId}`
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors du chargement des documents.");
+  }
+
+  return data;
+}

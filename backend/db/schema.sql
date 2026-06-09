@@ -32,3 +32,14 @@ CREATE TABLE IF NOT EXISTS applications (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS application_documents (
+  id SERIAL PRIMARY KEY,
+  application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  original_name TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  file_path TEXT NOT NULL,
+  file_size INTEGER NOT NULL CHECK (file_size >= 0),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

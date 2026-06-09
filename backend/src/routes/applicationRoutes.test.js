@@ -44,15 +44,73 @@ beforeAll(async () => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+});beforeAll(async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      first_name VARCHAR(100) NOT NULL,
+      last_name VARCHAR(100) NOT NULL,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role VARCHAR(30) NOT NULL DEFAULT 'client' CHECK (role IN ('client', 'admin')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS vehicles (
+      id SERIAL PRIMARY KEY,
+      brand VARCHAR(100) NOT NULL,
+      model VARCHAR(100) NOT NULL,
+      price INTEGER NOT NULL CHECK (price >= 0),
+      offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental', 'both')),
+      is_available BOOLEAN NOT NULL DEFAULT true,
+      image_url TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS applications (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      vehicle_id INTEGER NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,
+      offer_type VARCHAR(20) NOT NULL CHECK (offer_type IN ('purchase', 'rental')),
+      phone VARCHAR(30) NOT NULL,
+      message TEXT,
+      status VARCHAR(30) NOT NULL DEFAULT 'en_attente' CHECK (status IN ('en_attente', 'en_cours', 'valide', 'refuse')),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS application_documents (
+      id SERIAL PRIMARY KEY,
+      application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      original_name TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type VARCHAR(100) NOT NULL,
+      file_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL CHECK (file_size >= 0),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 });
 
 beforeEach(async () => {
+
+  await pool.query("DELETE FROM application_documents");
   await pool.query("DELETE FROM applications");
   await pool.query("DELETE FROM users WHERE email LIKE '%application.test.com'");
   await pool.query("DELETE FROM vehicles WHERE brand LIKE 'Test%'");
 });
 
 afterAll(async () => {
+
+  await pool.query("DELETE FROM application_documents");
   await pool.query("DELETE FROM applications");
   await pool.query("DELETE FROM users WHERE email LIKE '%application.test.com'");
   await pool.query("DELETE FROM vehicles WHERE brand LIKE 'Test%'");
@@ -465,6 +523,132 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
     expect(response.body[0].status).toBe("valide");
+  });
+});
+
+describe("Documents de dossier", () => {
+  test("envoie un document PDF pour un dossier client", async () => {
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+      message: "Dossier avec document.",
+    });
+
+    const response = await request(app)
+      .post(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .field("userId", user.id)
+      .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
+
+    expect(response.status).toBe(201);
+    expect(response.body.message).toBe("Document envoyé avec succès.");
+    expect(response.body.document.application_id).toBe(
+      createdApplication.body.application.id
+    );
+    expect(response.body.document.original_name).toBe("justificatif.pdf");
+    expect(response.body.document.mime_type).toBe("application/pdf");
+  });
+
+  test("refuse un format de document non autorisé", async () => {
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    const response = await request(app)
+      .post(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .field("userId", user.id)
+      .attach("document", Buffer.from("texte interdit"), "document.txt");
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Format de document non autorisé.");
+  });
+
+  test("refuse l'envoi si le dossier est introuvable", async () => {
+    const user = await createTestUser();
+
+    const response = await request(app)
+      .post("/api/applications/999999/documents")
+      .field("userId", user.id)
+      .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe("Dossier introuvable.");
+  });
+
+  test("liste les documents envoyés pour un dossier client", async () => {
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    await request(app)
+      .post(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .field("userId", user.id)
+      .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
+
+    const response = await request(app).get(
+      `/api/applications/${createdApplication.body.application.id}/documents?userId=${user.id}`
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].application_id).toBe(
+      createdApplication.body.application.id
+    );
+    expect(response.body[0].original_name).toBe("justificatif.pdf");
+    expect(response.body[0].mime_type).toBe("application/pdf");
+  });
+
+  test("refuse la consultation des documents d'un autre client", async () => {
+    const user = await createTestUser();
+    const passwordHash = await bcrypt.hash("Password123", 10);
+
+    const otherUserResult = await pool.query(
+      `
+      INSERT INTO users (first_name, last_name, email, password_hash, role)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id
+      `,
+      [
+        "Autre",
+        "Client",
+        "other-documents@application.test.com",
+        passwordHash,
+        "client",
+      ]
+    );
+
+    const otherUser = otherUserResult.rows[0];
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    const response = await request(app).get(
+      `/api/applications/${createdApplication.body.application.id}/documents?userId=${otherUser.id}`
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe("Ce dossier n'appartient pas à cet utilisateur.");
   });
 });
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchUserApplications } from "../services/applicationService";
+import ApplicationDocuments from "./ApplicationDocuments";
 
 export function getApplicationStatusLabel(status) {
   const labels = {
@@ -92,6 +93,10 @@ export default function UserApplications({ currentUser, refreshKey }) {
               </p>
 
               {application.message && <p>{application.message}</p>}
+                            <ApplicationDocuments
+                applicationId={application.id}
+                currentUser={currentUser}
+              />
             </article>
           ))}
         </div>

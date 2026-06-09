@@ -185,6 +185,55 @@ router.get("/admin/:applicationId", async (req, res) => {
   }
 });
 
+router.patch("/admin/:applicationId/status", async (req, res) => {
+  try {
+    const { adminUserId, status } = req.body;
+
+    const adminUser = await findAdminUser(adminUserId);
+
+    if (!adminUser || adminUser.role !== "admin") {
+      return res.status(403).json({
+        message: "Accès réservé aux administrateurs.",
+      });
+    }
+
+    const validStatuses = ["en_attente", "en_cours", "valide", "refuse"];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        message: "Le statut demandé est invalide.",
+      });
+    }
+
+    const updatedApplication = await pool.query(
+      `
+      UPDATE applications
+      SET status = $1,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $2
+      RETURNING id, user_id, vehicle_id, offer_type, phone, message, status, created_at, updated_at
+      `,
+      [status, req.params.applicationId]
+    );
+
+    if (updatedApplication.rows.length === 0) {
+      return res.status(404).json({
+        message: "Dossier introuvable.",
+      });
+    }
+
+    res.status(200).json({
+      message: "Statut du dossier mis à jour avec succès.",
+      application: updatedApplication.rows[0],
+    });
+  } catch (error) {
+    console.error("Error updating application status:", error);
+    res.status(500).json({
+      message: "Une erreur est survenue lors de la mise à jour du statut.",
+    });
+  }
+});
+
 router.get("/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;

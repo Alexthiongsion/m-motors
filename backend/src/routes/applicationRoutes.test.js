@@ -326,6 +326,148 @@ describe("GET /api/applications/admin/:applicationId", () => {
   });
 });
 
+describe("PATCH /api/applications/admin/:applicationId/status", () => {
+  test("valide un dossier si l'utilisateur est administrateur", async () => {
+    const admin = await createAdminUser();
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+      message: "Dossier à valider.",
+    });
+
+    const response = await request(app)
+      .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .send({
+        adminUserId: admin.id,
+        status: "valide",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toBe("Statut du dossier mis à jour avec succès.");
+    expect(response.body.application.status).toBe("valide");
+  });
+
+  test("refuse un dossier si l'utilisateur est administrateur", async () => {
+    const admin = await createAdminUser();
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("rental");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "rental",
+      phone: "0600000000",
+      message: "Dossier à refuser.",
+    });
+
+    const response = await request(app)
+      .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .send({
+        adminUserId: admin.id,
+        status: "refuse",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.application.status).toBe("refuse");
+  });
+
+  test("passe un dossier en cours d'analyse", async () => {
+    const admin = await createAdminUser();
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    const response = await request(app)
+      .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .send({
+        adminUserId: admin.id,
+        status: "en_cours",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.application.status).toBe("en_cours");
+  });
+
+  test("refuse la modification du statut à un client", async () => {
+    const user = await createTestUser();
+
+    const response = await request(app)
+      .patch("/api/applications/admin/1/status")
+      .send({
+        adminUserId: user.id,
+        status: "valide",
+      });
+
+    expect(response.status).toBe(403);
+    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+  });
+
+  test("refuse un statut invalide", async () => {
+    const admin = await createAdminUser();
+
+    const response = await request(app)
+      .patch("/api/applications/admin/1/status")
+      .send({
+        adminUserId: admin.id,
+        status: "archive",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Le statut demandé est invalide.");
+  });
+
+  test("retourne une erreur si le dossier est introuvable", async () => {
+    const admin = await createAdminUser();
+
+    const response = await request(app)
+      .patch("/api/applications/admin/999999/status")
+      .send({
+        adminUserId: admin.id,
+        status: "valide",
+      });
+
+    expect(response.status).toBe(404);
+    expect(response.body.message).toBe("Dossier introuvable.");
+  });
+
+  test("le client voit le statut mis à jour dans son espace personnel", async () => {
+    const admin = await createAdminUser();
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app).post("/api/applications").send({
+      userId: user.id,
+      vehicleId: vehicle.id,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    await request(app)
+      .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .send({
+        adminUserId: admin.id,
+        status: "valide",
+      });
+
+    const response = await request(app).get(`/api/applications/user/${user.id}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].status).toBe("valide");
+  });
+});
+
 describe("GET /api/applications/user/:userId", () => {
   test("retourne les dossiers d'un client", async () => {
     const user = await createTestUser();

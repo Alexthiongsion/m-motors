@@ -5,11 +5,13 @@ import AdminApplicationManager from "./AdminApplicationManager";
 import {
   fetchAdminApplicationDetail,
   fetchAdminApplications,
+  updateApplicationStatus,
 } from "../services/applicationService";
 
 vi.mock("../services/applicationService", () => ({
   fetchAdminApplications: vi.fn(),
   fetchAdminApplicationDetail: vi.fn(),
+  updateApplicationStatus: vi.fn(),
 }));
 
 const adminUser = {
@@ -42,6 +44,13 @@ describe("AdminApplicationManager", () => {
     vi.clearAllMocks();
     fetchAdminApplications.mockResolvedValue(applications);
     fetchAdminApplicationDetail.mockResolvedValue(applications[0]);
+    updateApplicationStatus.mockResolvedValue({
+      message: "Statut du dossier mis à jour avec succès.",
+      application: {
+        ...applications[0],
+        status: "valide",
+      },
+    });
   });
 
   afterEach(() => {
@@ -78,6 +87,42 @@ describe("AdminApplicationManager", () => {
     expect(screen.getByText("Téléphone : 0600000000")).toBeTruthy();
     expect(
       screen.getByText("Message : Je souhaite acheter ce véhicule.")
+    ).toBeTruthy();
+  });
+
+  test("valide un dossier depuis l'espace administrateur", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminApplicationManager currentUser={adminUser} />);
+
+    await screen.findByText("Dossier #12 — Client Test");
+
+    await user.click(screen.getByRole("button", { name: "Valider" }));
+
+    await waitFor(() => {
+      expect(updateApplicationStatus).toHaveBeenCalledWith(1, 12, "valide");
+    });
+
+    expect(
+      await screen.findByText("Statut du dossier mis à jour avec succès.")
+    ).toBeTruthy();
+  });
+
+  test("refuse un dossier depuis l'espace administrateur", async () => {
+    const user = userEvent.setup();
+
+    render(<AdminApplicationManager currentUser={adminUser} />);
+
+    await screen.findByText("Dossier #12 — Client Test");
+
+    await user.click(screen.getByRole("button", { name: "Refuser" }));
+
+    await waitFor(() => {
+      expect(updateApplicationStatus).toHaveBeenCalledWith(1, 12, "refuse");
+    });
+
+    expect(
+      await screen.findByText("Statut du dossier mis à jour avec succès.")
     ).toBeTruthy();
   });
 

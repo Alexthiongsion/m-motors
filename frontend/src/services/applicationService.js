@@ -57,3 +57,27 @@ export async function fetchAdminApplicationDetail(adminUserId, applicationId) {
 
   return data;
 }
+
+export async function updateApplicationStatus(adminUserId, applicationId, status) {
+  const response = await fetch(
+    `${API_URL}/api/applications/admin/${applicationId}/status`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        adminUserId,
+        status,
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Erreur lors de la mise à jour du statut.");
+  }
+
+  return data;
+}

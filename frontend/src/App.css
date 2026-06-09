@@ -529,3 +529,19 @@ h1 {
 .admin-application-detail h3 {
   margin-top: 0;
 }
+
+.admin-application-actions {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
+}
+
+.application-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.application-decision-actions button {
+  padding: 0.55rem 0.75rem;
+}

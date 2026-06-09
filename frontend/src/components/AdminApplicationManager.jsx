@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   fetchAdminApplicationDetail,
   fetchAdminApplications,
+  updateApplicationStatus,
 } from "../services/applicationService";
 import {
   getApplicationStatusClassName,
@@ -17,29 +18,29 @@ export default function AdminApplicationManager({ currentUser }) {
   const [selectedApplication, setSelectedApplication] = useState(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
   const [error, setError] = useState("");
   const [detailError, setDetailError] = useState("");
+  const [feedback, setFeedback] = useState("");
+
+  async function loadApplications() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await fetchAdminApplications(currentUser.id);
+      setApplications(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    if (!currentUser?.id) {
-      return;
+    if (currentUser?.id) {
+      loadApplications();
     }
-
-    async function loadApplications() {
-      try {
-        setLoading(true);
-        setError("");
-
-        const data = await fetchAdminApplications(currentUser.id);
-        setApplications(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadApplications();
   }, [currentUser?.id]);
 
   async function handleShowDetail(applicationId) {
@@ -56,6 +57,63 @@ export default function AdminApplicationManager({ currentUser }) {
     }
   }
 
+  async function handleStatusUpdate(applicationId, status) {
+    try {
+      setStatusUpdatingId(applicationId);
+      setFeedback("");
+      setDetailError("");
+
+      await updateApplicationStatus(currentUser.id, applicationId, status);
+      setFeedback("Statut du dossier mis à jour avec succès.");
+
+      await loadApplications();
+
+      if (selectedApplication?.id === applicationId) {
+        const updatedDetail = await fetchAdminApplicationDetail(
+          currentUser.id,
+          applicationId
+        );
+        setSelectedApplication(updatedDetail);
+      }
+    } catch (err) {
+      setDetailError(err.message);
+    } finally {
+      setStatusUpdatingId(null);
+    }
+  }
+
+  function renderStatusActions(application) {
+    const isUpdating = statusUpdatingId === application.id;
+
+    return (
+      <div className="application-decision-actions">
+        <button
+          type="button"
+          onClick={() => handleStatusUpdate(application.id, "en_cours")}
+          disabled={isUpdating}
+        >
+          En cours
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusUpdate(application.id, "valide")}
+          disabled={isUpdating}
+        >
+          Valider
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleStatusUpdate(application.id, "refuse")}
+          disabled={isUpdating}
+        >
+          Refuser
+        </button>
+      </div>
+    );
+  }
+
   return (
     <section className="admin-application-manager">
       <h2>Consultation des dossiers</h2>
@@ -65,6 +123,7 @@ export default function AdminApplicationManager({ currentUser }) {
 
       {loading && <p>Chargement des dossiers...</p>}
       {error && <p className="error">{error}</p>}
+      {feedback && <p className="success">{feedback}</p>}
 
       {!loading && !error && applications.length === 0 && (
         <p>Aucun dossier client pour le moment.</p>
@@ -99,12 +158,16 @@ export default function AdminApplicationManager({ currentUser }) {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => handleShowDetail(application.id)}
-              >
-                Voir le détail
-              </button>
+              <div className="admin-application-actions">
+                <button
+                  type="button"
+                  onClick={() => handleShowDetail(application.id)}
+                >
+                  Voir le détail
+                </button>
+
+                {renderStatusActions(application)}
+              </div>
             </article>
           ))}
         </div>
@@ -149,6 +212,8 @@ export default function AdminApplicationManager({ currentUser }) {
           ) : (
             <p>Message : aucun message fourni.</p>
           )}
+
+          {renderStatusActions(selectedApplication)}
         </article>
       )}
     </section>

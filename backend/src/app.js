@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const pool = require("./db");
 const vehicleRoutes = require("./routes/vehicleRoutes");
 const authRoutes = require("./routes/authRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
@@ -9,12 +10,57 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({ status: "ok", message: "M-Motors API is running" });
+app.use((req, res, next) => {
+  const start = Date.now();
+
+  res.on("finish", () => {
+    if (process.env.NODE_ENV !== "test") {
+      const duration = Date.now() - start;
+      console.log(`${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`);
+    }
+  });
+
+  next();
+});
+
+app.get("/api/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+
+    res.status(200).json({
+      status: "ok",
+      service: "m-motors-api",
+      database: "connected",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Health check failed:", error);
+
+    res.status(503).json({
+      status: "error",
+      service: "m-motors-api",
+      database: "disconnected",
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 app.use("/api/vehicles", vehicleRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/applications", applicationRoutes);
+
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route introuvable.",
+  });
+});
+
+app.use((error, req, res, next) => {
+  console.error("Unhandled server error:", error);
+
+  res.status(500).json({
+    message: "Erreur interne du serveur.",
+  });
+});
 
 module.exports = app;

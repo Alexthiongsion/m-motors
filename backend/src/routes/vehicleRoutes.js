@@ -1,22 +1,10 @@
 const express = require("express");
 const pool = require("../db");
+const { authenticateToken, requireAdmin } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
 const validOfferTypes = ["purchase", "rental", "both"];
-
-async function findAdminUser(adminUserId) {
-  if (!adminUserId) {
-    return null;
-  }
-
-  const result = await pool.query(
-    "SELECT id, role FROM users WHERE id = $1",
-    [adminUserId]
-  );
-
-  return result.rows[0] || null;
-}
 
 function validateVehiclePayload(body) {
   const {
@@ -111,16 +99,8 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/admin", async (req, res) => {
+router.get("/admin", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const adminUser = await findAdminUser(req.query.adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
-
     const result = await pool.query(`
       SELECT id, brand, model, price, offer_type, is_available, image_url
       FROM vehicles
@@ -136,16 +116,8 @@ router.get("/admin", async (req, res) => {
   }
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const adminUser = await findAdminUser(req.body.adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
-
     const validation = validateVehiclePayload(req.body);
 
     if (!validation.isValid) {
@@ -177,16 +149,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const adminUser = await findAdminUser(req.body.adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
-
     const validation = validateVehiclePayload(req.body);
 
     if (!validation.isValid) {

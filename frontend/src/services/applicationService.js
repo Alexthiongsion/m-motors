@@ -1,10 +1,21 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
 
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+
+  return token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : {};
+}
+
 export async function createApplication(applicationData) {
   const response = await fetch(`${API_URL}/api/applications`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
     body: JSON.stringify(applicationData),
   });
@@ -19,7 +30,11 @@ export async function createApplication(applicationData) {
 }
 
 export async function fetchUserApplications(userId) {
-  const response = await fetch(`${API_URL}/api/applications/user/${userId}`);
+  const response = await fetch(`${API_URL}/api/applications/user/${userId}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
 
   const data = await response.json();
 
@@ -31,9 +46,11 @@ export async function fetchUserApplications(userId) {
 }
 
 export async function fetchAdminApplications(adminUserId) {
-  const response = await fetch(
-    `${API_URL}/api/applications/admin?adminUserId=${adminUserId}`
-  );
+  const response = await fetch(`${API_URL}/api/applications/admin`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
 
   const data = await response.json();
 
@@ -45,9 +62,11 @@ export async function fetchAdminApplications(adminUserId) {
 }
 
 export async function fetchAdminApplicationDetail(adminUserId, applicationId) {
-  const response = await fetch(
-    `${API_URL}/api/applications/admin/${applicationId}?adminUserId=${adminUserId}`
-  );
+  const response = await fetch(`${API_URL}/api/applications/admin/${applicationId}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
 
   const data = await response.json();
 
@@ -65,9 +84,9 @@ export async function updateApplicationStatus(adminUserId, applicationId, status
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
-        adminUserId,
         status,
       }),
     }
@@ -85,13 +104,15 @@ export async function updateApplicationStatus(adminUserId, applicationId, status
 export async function uploadApplicationDocument(applicationId, userId, file) {
   const formData = new FormData();
 
-  formData.append("userId", userId);
   formData.append("document", file);
 
   const response = await fetch(
     `${API_URL}/api/applications/${applicationId}/documents`,
     {
       method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+      },
       body: formData,
     }
   );
@@ -106,9 +127,11 @@ export async function uploadApplicationDocument(applicationId, userId, file) {
 }
 
 export async function fetchApplicationDocuments(applicationId, userId) {
-  const response = await fetch(
-    `${API_URL}/api/applications/${applicationId}/documents?userId=${userId}`
-  );
+  const response = await fetch(`${API_URL}/api/applications/${applicationId}/documents`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
 
   const data = await response.json();
 

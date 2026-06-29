@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const pool = require("../db");
+const { authenticateToken, requireAdmin } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
@@ -29,6 +30,9 @@ const storage = multer.diskStorage({
 
 const uploadDocument = multer({
   storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
   fileFilter: (req, file, callback) => {
     if (!allowedDocumentMimeTypes.includes(file.mimetype)) {
       return callback(new Error("FORMAT_INVALIDE"));
@@ -38,22 +42,10 @@ const uploadDocument = multer({
   },
 });
 
-async function findAdminUser(adminUserId) {
-  if (!adminUserId) {
-    return null;
-  }
-
-  const result = await pool.query(
-    "SELECT id, role FROM users WHERE id = $1",
-    [adminUserId]
-  );
-
-  return result.rows[0] || null;
-}
-
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   try {
-    const { userId, vehicleId, offerType, phone, message } = req.body;
+    const { vehicleId, offerType, phone, message } = req.body;
+    const userId = req.user.id;
 
     if (!userId || !vehicleId || !offerType || !phone) {
       return res.status(400).json({
@@ -127,16 +119,8 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/admin", async (req, res) => {
+router.get("/admin", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const adminUser = await findAdminUser(req.query.adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
-
     const applicationsResult = await pool.query(`
       SELECT
         applications.id,
@@ -169,16 +153,8 @@ router.get("/admin", async (req, res) => {
   }
 });
 
-router.get("/admin/:applicationId", async (req, res) => {
+router.get("/admin/:applicationId", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const adminUser = await findAdminUser(req.query.adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
-
     const applicationResult = await pool.query(
       `
       SELECT
@@ -220,17 +196,9 @@ router.get("/admin/:applicationId", async (req, res) => {
   }
 });
 
-router.patch("/admin/:applicationId/status", async (req, res) => {
+router.patch("/admin/:applicationId/status", authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { adminUserId, status } = req.body;
-
-    const adminUser = await findAdminUser(adminUserId);
-
-    if (!adminUser || adminUser.role !== "admin") {
-      return res.status(403).json({
-        message: "Accès réservé aux administrateurs.",
-      });
-    }
+    const { status } = req.body;
 
     const validStatuses = ["en_attente", "en_cours", "valide", "refuse"];
 
@@ -271,21 +239,12 @@ router.patch("/admin/:applicationId/status", async (req, res) => {
 
 router.post(
   "/:applicationId/documents",
+  authenticateToken,
   uploadDocument.single("document"),
   async (req, res) => {
     try {
       const { applicationId } = req.params;
-      const { userId } = req.body;
-
-      if (!userId) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
-
-        return res.status(400).json({
-          message: "L'utilisateur doit être renseigné.",
-        });
-      }
+      const userId = req.user.id;
 
       const applicationResult = await pool.query(
         "SELECT id, user_id FROM applications WHERE id = $1",
@@ -357,16 +316,10 @@ router.post(
   }
 );
 
-router.get("/:applicationId/documents", async (req, res) => {
+router.get("/:applicationId/documents", authenticateToken, async (req, res) => {
   try {
     const { applicationId } = req.params;
-    const { userId } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({
-        message: "L'utilisateur doit être renseigné.",
-      });
-    }
+    const userId = req.user.id;
 
     const applicationResult = await pool.query(
       "SELECT id, user_id FROM applications WHERE id = $1",
@@ -407,9 +360,15 @@ router.get("/:applicationId/documents", async (req, res) => {
   }
 });
 
-router.get("/user/:userId", async (req, res) => {
+router.get("/user/:userId", authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (req.user.role !== "admin" && Number(req.user.id) !== Number(userId)) {
+      return res.status(403).json({
+        message: "Accès interdit à ces dossiers.",
+      });
+    }
 
     const userResult = await pool.query("SELECT id FROM users WHERE id = $1", [
       userId,
@@ -457,6 +416,12 @@ router.use((error, req, res, next) => {
   if (error.message === "FORMAT_INVALIDE") {
     return res.status(400).json({
       message: "Format de document non autorisé.",
+    });
+  }
+
+  if (error.code === "LIMIT_FILE_SIZE") {
+    return res.status(400).json({
+      message: "Le document ne doit pas dépasser 5 Mo.",
     });
   }
 

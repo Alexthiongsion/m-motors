@@ -1,5 +1,15 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5050";
 
+function getAuthHeaders() {
+  const token = localStorage.getItem("token");
+
+  return token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : {};
+}
+
 export async function fetchVehicles(search = "", offerType = "all") {
   const params = new URLSearchParams();
 
@@ -24,9 +34,11 @@ export async function fetchVehicles(search = "", offerType = "all") {
 }
 
 export async function fetchAdminVehicles(adminUserId) {
-  const response = await fetch(
-    `${API_URL}/api/vehicles/admin?adminUserId=${adminUserId}`
-  );
+  const response = await fetch(`${API_URL}/api/vehicles/admin`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Erreur lors du chargement des véhicules administrateur");
@@ -40,11 +52,9 @@ export async function createVehicle(adminUserId, vehicleData) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
-    body: JSON.stringify({
-      adminUserId,
-      ...vehicleData,
-    }),
+    body: JSON.stringify(vehicleData),
   });
 
   const data = await response.json();
@@ -61,11 +71,9 @@ export async function updateVehicle(adminUserId, vehicleId, vehicleData) {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
     },
-    body: JSON.stringify({
-      adminUserId,
-      ...vehicleData,
-    }),
+    body: JSON.stringify(vehicleData),
   });
 
   const data = await response.json();

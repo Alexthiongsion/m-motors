@@ -1,5 +1,9 @@
 const request = require("supertest");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || "m-motors-test-secret";
+
 const app = require("../app");
 const pool = require("../db");
 
@@ -117,6 +121,19 @@ afterAll(async () => {
   await pool.end();
 });
 
+
+function createAuthToken(userId, role = "client", email = "client@application.test.com") {
+  return jwt.sign(
+    {
+      id: userId,
+      email,
+      role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "2h" }
+  );
+}
+
 async function createTestUser() {
   const passwordHash = await bcrypt.hash("Password123", 10);
 
@@ -129,7 +146,12 @@ async function createTestUser() {
     ["Client", "Application", "client@application.test.com", passwordHash, "client"]
   );
 
-  return result.rows[0];
+  const user = result.rows[0];
+
+  return {
+    ...user,
+    token: createAuthToken(user.id, "client", "client@application.test.com"),
+  };
 }
 
 async function createAdminUser() {
@@ -144,7 +166,12 @@ async function createAdminUser() {
     ["Admin", "Application", "admin@application.test.com", passwordHash, "admin"]
   );
 
-  return result.rows[0];
+  const admin = result.rows[0];
+
+  return {
+    ...admin,
+    token: createAuthToken(admin.id, "admin", "admin@application.test.com"),
+  };
 }
 
 async function createTestVehicle(offerType = "purchase", isAvailable = true) {
@@ -161,11 +188,27 @@ async function createTestVehicle(offerType = "purchase", isAvailable = true) {
 }
 
 describe("POST /api/applications", () => {
+  test("refuse le dépôt de dossier sans token", async () => {
+    const response = await request(app)
+      .post("/api/applications")
+      .send({
+      vehicleId: 1,
+      offerType: "purchase",
+      phone: "0600000000",
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Token d'authentification manquant.");
+  });
+
   test("crée un dossier valide avec le statut en_attente", async () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const response = await request(app).post("/api/applications").send({
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -186,7 +229,10 @@ describe("POST /api/applications", () => {
   const user = await createTestUser();
   const vehicle = await createTestVehicle("both");
 
-  const response = await request(app).post("/api/applications").send({
+  const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
     userId: user.id,
     vehicleId: vehicle.id,
     offerType: "purchase",
@@ -203,7 +249,12 @@ describe("POST /api/applications", () => {
 });
 
   test("refuse la création si un champ obligatoire est manquant", async () => {
-    const response = await request(app).post("/api/applications").send({
+    const user = await createTestUser();
+
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: 1,
       offerType: "purchase",
       phone: "0600000000",
@@ -214,7 +265,12 @@ describe("POST /api/applications", () => {
   });
 
   test("refuse la création si le type de demande est invalide", async () => {
-    const response = await request(app).post("/api/applications").send({
+    const user = await createTestUser();
+
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: 1,
       vehicleId: 1,
       offerType: "credit",
@@ -228,7 +284,10 @@ describe("POST /api/applications", () => {
   test("refuse la création si l'utilisateur est introuvable", async () => {
     const vehicle = await createTestVehicle("purchase");
 
-    const response = await request(app).post("/api/applications").send({
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${createAuthToken(999999)}`)
+      .send({
       userId: 999999,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -242,7 +301,10 @@ describe("POST /api/applications", () => {
   test("refuse la création si le véhicule est introuvable", async () => {
     const user = await createTestUser();
 
-    const response = await request(app).post("/api/applications").send({
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: 999999,
       offerType: "purchase",
@@ -257,7 +319,10 @@ describe("POST /api/applications", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase", false);
 
-    const response = await request(app).post("/api/applications").send({
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -272,7 +337,10 @@ describe("POST /api/applications", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("rental");
 
-    const response = await request(app).post("/api/applications").send({
+    const response = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -290,7 +358,10 @@ describe("GET /api/applications/admin", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    await request(app).post("/api/applications").send({
+    await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -298,9 +369,9 @@ describe("GET /api/applications/admin", () => {
       message: "Dossier à analyser.",
     });
 
-    const response = await request(app).get(
-      `/api/applications/admin?adminUserId=${admin.id}`
-    );
+    const response = await request(app)
+      .get("/api/applications/admin")
+      .set("Authorization", `Bearer ${admin.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -319,12 +390,12 @@ describe("GET /api/applications/admin", () => {
   test("refuse la consultation des dossiers à un client", async () => {
     const user = await createTestUser();
 
-    const response = await request(app).get(
-      `/api/applications/admin?adminUserId=${user.id}`
-    );
+    const response = await request(app)
+      .get("/api/applications/admin")
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 });
 
@@ -334,7 +405,10 @@ describe("GET /api/applications/admin/:applicationId", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("rental");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "rental",
@@ -342,9 +416,9 @@ describe("GET /api/applications/admin/:applicationId", () => {
       message: "Je souhaite louer ce véhicule.",
     });
 
-    const response = await request(app).get(
-      `/api/applications/admin/${createdApplication.body.application.id}?adminUserId=${admin.id}`
-    );
+    const response = await request(app)
+      .get(`/api/applications/admin/${createdApplication.body.application.id}`)
+      .set("Authorization", `Bearer ${admin.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.id).toBe(createdApplication.body.application.id);
@@ -364,20 +438,20 @@ describe("GET /api/applications/admin/:applicationId", () => {
   test("refuse le détail d'un dossier à un client", async () => {
     const user = await createTestUser();
 
-    const response = await request(app).get(
-      `/api/applications/admin/1?adminUserId=${user.id}`
-    );
+    const response = await request(app)
+      .get("/api/applications/admin/1")
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 
   test("retourne une erreur si le dossier est introuvable", async () => {
     const admin = await createAdminUser();
 
-    const response = await request(app).get(
-      `/api/applications/admin/999999?adminUserId=${admin.id}`
-    );
+    const response = await request(app)
+      .get("/api/applications/admin/999999")
+      .set("Authorization", `Bearer ${admin.token}`);
 
     expect(response.status).toBe(404);
     expect(response.body.message).toBe("Dossier introuvable.");
@@ -390,7 +464,10 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -400,6 +477,7 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "valide",
@@ -415,7 +493,10 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("rental");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "rental",
@@ -425,6 +506,7 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "refuse",
@@ -439,7 +521,10 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -448,6 +533,7 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "en_cours",
@@ -462,13 +548,14 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch("/api/applications/admin/1/status")
+      .set("Authorization", `Bearer ${user.token}`)
       .send({
         adminUserId: user.id,
         status: "valide",
       });
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 
   test("refuse un statut invalide", async () => {
@@ -476,6 +563,7 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch("/api/applications/admin/1/status")
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "archive",
@@ -490,6 +578,7 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     const response = await request(app)
       .patch("/api/applications/admin/999999/status")
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "valide",
@@ -504,7 +593,10 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -513,12 +605,15 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 
     await request(app)
       .patch(`/api/applications/admin/${createdApplication.body.application.id}/status`)
+      .set("Authorization", `Bearer ${admin.token}`)
       .send({
         adminUserId: admin.id,
         status: "valide",
       });
 
-    const response = await request(app).get(`/api/applications/user/${user.id}`);
+    const response = await request(app)
+      .get(`/api/applications/user/${user.id}`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -531,7 +626,10 @@ describe("Documents de dossier", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -541,7 +639,7 @@ describe("Documents de dossier", () => {
 
     const response = await request(app)
       .post(`/api/applications/${createdApplication.body.application.id}/documents`)
-      .field("userId", user.id)
+      .set("Authorization", `Bearer ${user.token}`)
       .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
 
     expect(response.status).toBe(201);
@@ -557,7 +655,10 @@ describe("Documents de dossier", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -566,7 +667,7 @@ describe("Documents de dossier", () => {
 
     const response = await request(app)
       .post(`/api/applications/${createdApplication.body.application.id}/documents`)
-      .field("userId", user.id)
+      .set("Authorization", `Bearer ${user.token}`)
       .attach("document", Buffer.from("texte interdit"), "document.txt");
 
     expect(response.status).toBe(400);
@@ -578,7 +679,7 @@ describe("Documents de dossier", () => {
 
     const response = await request(app)
       .post("/api/applications/999999/documents")
-      .field("userId", user.id)
+      .set("Authorization", `Bearer ${user.token}`)
       .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
 
     expect(response.status).toBe(404);
@@ -589,7 +690,10 @@ describe("Documents de dossier", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -598,12 +702,12 @@ describe("Documents de dossier", () => {
 
     await request(app)
       .post(`/api/applications/${createdApplication.body.application.id}/documents`)
-      .field("userId", user.id)
+      .set("Authorization", `Bearer ${user.token}`)
       .attach("document", Buffer.from("%PDF-1.4 test"), "justificatif.pdf");
 
-    const response = await request(app).get(
-      `/api/applications/${createdApplication.body.application.id}/documents?userId=${user.id}`
-    );
+    const response = await request(app)
+      .get(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -633,19 +737,25 @@ describe("Documents de dossier", () => {
       ]
     );
 
-    const otherUser = otherUserResult.rows[0];
+    const otherUser = {
+      ...otherUserResult.rows[0],
+      token: createAuthToken(otherUserResult.rows[0].id, "client", "other-documents@application.test.com"),
+    };
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
       phone: "0600000000",
     });
 
-    const response = await request(app).get(
-      `/api/applications/${createdApplication.body.application.id}/documents?userId=${otherUser.id}`
-    );
+    const response = await request(app)
+      .get(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .set("Authorization", `Bearer ${otherUser.token}`);
 
     expect(response.status).toBe(403);
     expect(response.body.message).toBe("Ce dossier n'appartient pas à cet utilisateur.");
@@ -657,7 +767,10 @@ describe("GET /api/applications/user/:userId", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    await request(app).post("/api/applications").send({
+    await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -665,7 +778,9 @@ describe("GET /api/applications/user/:userId", () => {
       message: "Demande de test.",
     });
 
-    const response = await request(app).get(`/api/applications/user/${user.id}`);
+    const response = await request(app)
+      .get(`/api/applications/user/${user.id}`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -679,7 +794,10 @@ describe("GET /api/applications/user/:userId", () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");
 
-    const createdApplication = await request(app).post("/api/applications").send({
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
       userId: user.id,
       vehicleId: vehicle.id,
       offerType: "purchase",
@@ -692,7 +810,9 @@ describe("GET /api/applications/user/:userId", () => {
       createdApplication.body.application.id,
     ]);
 
-    const response = await request(app).get(`/api/applications/user/${user.id}`);
+    const response = await request(app)
+      .get(`/api/applications/user/${user.id}`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -718,25 +838,39 @@ describe("GET /api/applications/user/:userId", () => {
       ]
     );
 
-    const otherUser = otherUserResult.rows[0];
+    const otherUser = {
+      ...otherUserResult.rows[0],
+      token: createAuthToken(
+        otherUserResult.rows[0].id,
+        "client",
+        "other-client@application.test.com"
+      ),
+    };
+
     const vehicle = await createTestVehicle("purchase");
     const otherVehicle = await createTestVehicle("purchase");
 
-    await request(app).post("/api/applications").send({
-      userId: user.id,
-      vehicleId: vehicle.id,
-      offerType: "purchase",
-      phone: "0600000000",
-    });
+    await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
+        vehicleId: vehicle.id,
+        offerType: "purchase",
+        phone: "0600000000",
+      });
 
-    await request(app).post("/api/applications").send({
-      userId: otherUser.id,
-      vehicleId: otherVehicle.id,
-      offerType: "purchase",
-      phone: "0611111111",
-    });
+    await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${otherUser.token}`)
+      .send({
+        vehicleId: otherVehicle.id,
+        offerType: "purchase",
+        phone: "0611111111",
+      });
 
-    const response = await request(app).get(`/api/applications/user/${user.id}`);
+    const response = await request(app)
+      .get(`/api/applications/user/${user.id}`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(1);
@@ -746,14 +880,18 @@ describe("GET /api/applications/user/:userId", () => {
   test("retourne un tableau vide si le client n'a aucun dossier", async () => {
     const user = await createTestUser();
 
-    const response = await request(app).get(`/api/applications/user/${user.id}`);
+    const response = await request(app)
+      .get(`/api/applications/user/${user.id}`)
+      .set("Authorization", `Bearer ${user.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual([]);
   });
 
   test("refuse la récupération si l'utilisateur est introuvable", async () => {
-    const response = await request(app).get("/api/applications/user/999999");
+    const response = await request(app)
+      .get("/api/applications/user/999999")
+      .set("Authorization", `Bearer ${createAuthToken(999999)}`);
 
     expect(response.status).toBe(404);
     expect(response.body.message).toBe("Utilisateur introuvable.");

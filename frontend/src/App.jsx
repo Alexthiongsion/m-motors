@@ -76,6 +76,7 @@ export default function App() {
 
   function handleLogout() {
     localStorage.removeItem("currentUser");
+    localStorage.removeItem("token");
     setCurrentUser(null);
   }
 

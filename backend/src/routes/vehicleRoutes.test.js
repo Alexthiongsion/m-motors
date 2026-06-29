@@ -1,9 +1,15 @@
 const request = require("supertest");
+const jwt = require("jsonwebtoken");
+
+process.env.JWT_SECRET = process.env.JWT_SECRET || "m-motors-test-secret";
+
 const app = require("../app");
 const pool = require("../db");
 
 let adminUserId;
 let clientUserId;
+let adminToken;
+let clientToken;
 let createdVehicleId;
 
 beforeAll(async () => {
@@ -34,6 +40,26 @@ beforeAll(async () => {
 
   adminUserId = adminResult.rows[0].id;
   clientUserId = clientResult.rows[0].id;
+
+  adminToken = jwt.sign(
+    {
+      id: adminUserId,
+      email: "admin.vehicle@test.com",
+      role: "admin",
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "2h" }
+  );
+
+  clientToken = jwt.sign(
+    {
+      id: clientUserId,
+      email: "client.vehicle@test.com",
+      role: "client",
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "2h" }
+  );
 });
 
 afterAll(async () => {
@@ -108,10 +134,17 @@ describe("GET /api/vehicles", () => {
 });
 
 describe("GET /api/vehicles/admin", () => {
+  test("refuse l'accès sans token", async () => {
+    const response = await request(app).get("/api/vehicles/admin");
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Token d'authentification manquant.");
+  });
+
   test("retourne tous les véhicules pour un administrateur", async () => {
-    const response = await request(app).get(
-      `/api/vehicles/admin?adminUserId=${adminUserId}`
-    );
+    const response = await request(app)
+      .get("/api/vehicles/admin")
+      .set("Authorization", `Bearer ${adminToken}`);
 
     expect(response.status).toBe(200);
     expect(response.body.length).toBeGreaterThan(0);
@@ -119,12 +152,12 @@ describe("GET /api/vehicles/admin", () => {
   });
 
   test("refuse l'accès à un client", async () => {
-    const response = await request(app).get(
-      `/api/vehicles/admin?adminUserId=${clientUserId}`
-    );
+    const response = await request(app)
+      .get("/api/vehicles/admin")
+      .set("Authorization", `Bearer ${clientToken}`);
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 });
 
@@ -132,8 +165,8 @@ describe("POST /api/vehicles", () => {
   test("crée un véhicule si l'utilisateur est administrateur", async () => {
     const response = await request(app)
       .post("/api/vehicles")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({
-        adminUserId,
         brand: "AdminVehicle",
         model: "Creation",
         price: 19900,
@@ -155,8 +188,8 @@ describe("POST /api/vehicles", () => {
   test("refuse la création si l'utilisateur n'est pas administrateur", async () => {
     const response = await request(app)
       .post("/api/vehicles")
+      .set("Authorization", `Bearer ${clientToken}`)
       .send({
-        adminUserId: clientUserId,
         brand: "AdminVehicle",
         model: "Refus",
         price: 15000,
@@ -166,14 +199,14 @@ describe("POST /api/vehicles", () => {
       });
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 
   test("refuse la création si un champ obligatoire manque", async () => {
     const response = await request(app)
       .post("/api/vehicles")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({
-        adminUserId,
         brand: "AdminVehicle",
         price: 15000,
         offerType: "purchase",
@@ -189,8 +222,8 @@ describe("POST /api/vehicles", () => {
   test("refuse la création si le type d'offre est invalide", async () => {
     const response = await request(app)
       .post("/api/vehicles")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({
-        adminUserId,
         brand: "AdminVehicle",
         model: "Invalid",
         price: 15000,
@@ -207,8 +240,8 @@ describe("PUT /api/vehicles/:id", () => {
   test("modifie un véhicule si l'utilisateur est administrateur", async () => {
     const response = await request(app)
       .put(`/api/vehicles/${createdVehicleId}`)
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({
-        adminUserId,
         brand: "AdminVehicle",
         model: "Modification",
         price: 21000,
@@ -237,8 +270,8 @@ describe("PUT /api/vehicles/:id", () => {
   test("refuse la modification si l'utilisateur n'est pas administrateur", async () => {
     const response = await request(app)
       .put(`/api/vehicles/${createdVehicleId}`)
+      .set("Authorization", `Bearer ${clientToken}`)
       .send({
-        adminUserId: clientUserId,
         brand: "AdminVehicle",
         model: "ClientRefus",
         price: 21000,
@@ -248,14 +281,14 @@ describe("PUT /api/vehicles/:id", () => {
       });
 
     expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Accès réservé aux administrateurs.");
+    expect(response.body.message).toBe("Accès administrateur requis.");
   });
 
   test("retourne une erreur si le véhicule n'existe pas", async () => {
     const response = await request(app)
       .put("/api/vehicles/999999")
+      .set("Authorization", `Bearer ${adminToken}`)
       .send({
-        adminUserId,
         brand: "AdminVehicle",
         model: "Introuvable",
         price: 21000,

@@ -33,5 +33,9 @@ export async function loginUser(credentials) {
     throw new Error(data.message || "Erreur lors de la connexion.");
   }
 
+  if (data.token) {
+    localStorage.setItem("token", data.token);
+  }
+
   return data;
 }

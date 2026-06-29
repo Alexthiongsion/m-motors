@@ -622,6 +622,30 @@ describe("PATCH /api/applications/admin/:applicationId/status", () => {
 });
 
 describe("Documents de dossier", () => {
+  test("refuse un document de plus de 5 Mo", async () => {
+    const user = await createTestUser();
+    const vehicle = await createTestVehicle("purchase");
+
+    const createdApplication = await request(app)
+      .post("/api/applications")
+      .set("Authorization", `Bearer ${user.token}`)
+      .send({
+        vehicleId: vehicle.id,
+        offerType: "purchase",
+        phone: "0600000000",
+      });
+
+    const oversizedFile = Buffer.alloc(5 * 1024 * 1024 + 1, "a");
+
+    const response = await request(app)
+      .post(`/api/applications/${createdApplication.body.application.id}/documents`)
+      .set("Authorization", `Bearer ${user.token}`)
+      .attach("document", oversizedFile, "gros-document.pdf");
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Le document ne doit pas dépasser 5 Mo.");
+  });
+
   test("envoie un document PDF pour un dossier client", async () => {
     const user = await createTestUser();
     const vehicle = await createTestVehicle("purchase");

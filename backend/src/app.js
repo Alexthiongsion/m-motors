@@ -7,11 +7,43 @@ const applicationRoutes = require("./routes/applicationRoutes");
 
 const app = express();
 
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
+const normalizeOrigin = (origin) => origin?.replace(/\/$/, "");
+
+const localFrontendUrl = "http://localhost:5173";
+const frontendUrl = normalizeOrigin(process.env.FRONTEND_URL);
+
+if (process.env.NODE_ENV === "production" && !frontendUrl) {
+  throw new Error("FRONTEND_URL must be defined in production");
+}
+
+const allowedOrigins =
+  process.env.NODE_ENV === "production"
+    ? [frontendUrl]
+    : [frontendUrl, localFrontendUrl].filter(Boolean);
+
+app.use((req, res, next) => {
+  const origin = normalizeOrigin(req.headers.origin);
+
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({
+      message: "Origin not allowed by CORS.",
+    });
+  }
+
+  next();
+});
 
 app.use(
   cors({
-    origin: allowedOrigin,
+    origin(origin, callback) {
+      const normalizedOrigin = normalizeOrigin(origin);
+
+      if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      return callback(null, false);
+    },
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
